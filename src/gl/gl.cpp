@@ -712,22 +712,21 @@ void gl_draw_external_mesh(ExternalMeshInstance* character, struct light_data* l
 		}
 		else newRenderer.draw(true, true, true);
 
-		// A color the game adds to the character (battle: red while dying, status tints) is drawn over the part in
-		// that color, additively, like the game adds it to its own models' colors; it fades with the character
+		// A color the game adds to the character (battle: red while dying, status tints, a summon's glow) is drawn over
+		// the part additively, through the part's texture: the game adds it to its own models' vertex colors, which the
+		// texture then multiplies, so a white glow brightens the model instead of covering it. It fades with the
+		// character; the part's alpha test (cut-out hair) stays as it was drawn
 		if (addedColor)
 		{
 			newRenderer.setInterpolationQualifier(SMOOTH);
 			newRenderer.setBlendMode(RendererBlendMode::BLEND_ADD);
-			newRenderer.doAlphaTest(false);
 			newRenderer.doDepthWrite(false);
-			newRenderer.isTexture(false);
 			newRenderer.setCommonUniforms();
 			newRenderer.setSkinnedColorOverride(true, character->addedColor.x * character->fadeAlpha,
 				character->addedColor.y * character->fadeAlpha, character->addedColor.z * character->fadeAlpha);
 			newRenderer.draw(true, true, true);
 
 			// The override is switched off before the next part's draw (setting it twice for one draw is an error)
-			newRenderer.isTexture(true);
 			newRenderer.doDepthWrite(pass != ShapePass::Blend);
 		}
 	};

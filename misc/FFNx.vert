@@ -47,7 +47,7 @@ uniform vec4 gameScriptedLightColor;
 // so ordinary 3D draws don't pay for it
 #ifdef SMOOTH_SKINNING
 uniform mat4 boneMatrices[MAX_BONE_MATRICES];
-// When w > 0, the model is drawn in this flat color (a color the game adds to a model, drawn as an additive pass)
+// When w > 0, this color replaces the model's vertex colors (a color the game adds to a model, drawn as an additive pass)
 uniform vec4 skinnedColorOverride;
 #endif
 

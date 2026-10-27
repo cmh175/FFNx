@@ -619,8 +619,8 @@ public:
     void isSmoothSkinning(bool flag = false);
     void setSmoothSkinningBoneMatrices(std::array<struct matrix, MAX_BONE_MATRICES>* matrix_palette, size_t joint_count);
     void setSmoothSkinningUniforms();
-    // Draws a skinned model in one flat color instead of its own (a color the game adds to a model, drawn as an
-    // additive pass); call without arguments to go back to the model's own colors
+    // Replaces a skinned model's vertex colors with one color (a color the game adds to a model, drawn as an additive
+    // pass through the model's textures); call without arguments to go back to the model's own colors
     void setSkinnedColorOverride(bool enabled = false, float r = 0.0f, float g = 0.0f, float b = 0.0f);
 
     // Worldmap
