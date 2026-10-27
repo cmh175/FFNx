@@ -499,7 +499,8 @@ void ExternalMesh::loadMeshes(cgltf_data* data, const std::vector<std::vector<in
 // Joints named after the game's bones (bone_NN) give the game their positions in battle
 void ExternalMesh::findGameBoneJoints()
 {
-    // Joints named after the game's bones (bone_00, bone_01, ...: KimeraCS battle exports)
+    // Joints named after the game's bones (bone_00, bone_01, ...: KimeraCS battle exports), optionally followed by a
+    // readable name (bone_00_hip, bone_05_l_uparm, ...)
     if (!skins.empty())
     {
         for (size_t j = 0; j < skins[0].joints.size(); j++)
@@ -509,7 +510,7 @@ void ExternalMesh::findGameBoneJoints()
 
             char* end = nullptr;
             long boneIndex = strtol(name.c_str() + 5, &end, 10);
-            if (end == name.c_str() + 5 || *end != 0 || boneIndex < 0 || boneIndex >= 512) continue;
+            if (end == name.c_str() + 5 || (*end != 0 && *end != '_') || boneIndex < 0 || boneIndex >= 512) continue;
 
             if (gameBoneJoints.size() <= static_cast<size_t>(boneIndex)) gameBoneJoints.resize(boneIndex + 1, -1);
             gameBoneJoints[boneIndex] = static_cast<int>(j);
