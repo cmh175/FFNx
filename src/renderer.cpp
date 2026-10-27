@@ -1176,6 +1176,7 @@ void Renderer::init()
 
     bgfxUniformHandles[RendererUniform::BONE_MATRICES] = createUniform("boneMatrices", bgfx::UniformType::Mat4, MAX_BONE_MATRICES);
     bgfxUniformHandles[RendererUniform::SKINNED_COLOR_OVERRIDE] = createUniform("skinnedColorOverride", bgfx::UniformType::Vec4);
+    bgfxUniformHandles[RendererUniform::SKINNED_COLOR_SCALE] = createUniform("skinnedColorScale", bgfx::UniformType::Vec4);
 
     for(int i = 0; i < RendererTextureSlot::COUNT; ++i)
     {
@@ -2614,6 +2615,12 @@ void Renderer::setSkinnedColorOverride(bool enabled, float r, float g, float b)
 {
     float color[4] = { r, g, b, enabled ? 1.0f : 0.0f };
     setUniform(RendererUniform::SKINNED_COLOR_OVERRIDE, color);
+}
+
+void Renderer::setSkinnedColorScale(bool enabled, float scale)
+{
+    float value[4] = { scale, scale, scale, enabled ? 1.0f : 0.0f };
+    setUniform(RendererUniform::SKINNED_COLOR_SCALE, value);
 }
 
 void Renderer::setSphericalWorldRate(float value)

@@ -47,6 +47,8 @@ uniform vec4 gameScriptedLightColor;
 // so ordinary 3D draws don't pay for it
 #ifdef SMOOTH_SKINNING
 uniform mat4 boneMatrices[MAX_BONE_MATRICES];
+// When w > 0, the model's colors are darkened by this factor (a battle scene the game dims)
+uniform vec4 skinnedColorScale;
 #endif
 
 #define isTLVertex VSFlags.x > 0.0
@@ -129,6 +131,10 @@ void main()
 
     if (blendMode == 4.0) color.a = 1.0;
     else if (blendMode == 3.0) color.a = 0.25;
+
+#ifdef SMOOTH_SKINNING
+    if (skinnedColorScale.w > 0.0) color.rgb *= toLinear(skinnedColorScale.rgb);
+#endif
 
 #if BGFX_SHADER_LANGUAGE_HLSL
 #else

@@ -49,6 +49,8 @@ uniform vec4 gameScriptedLightColor;
 uniform mat4 boneMatrices[MAX_BONE_MATRICES];
 // When w > 0, this color replaces the model's vertex colors (a color the game adds to a model, drawn as an additive pass)
 uniform vec4 skinnedColorOverride;
+// When w > 0, the model's colors are darkened by this factor (a battle scene the game dims)
+uniform vec4 skinnedColorScale;
 #endif
 
 uniform vec4 VSFlags;
@@ -131,6 +133,7 @@ void main()
 
 #ifdef SMOOTH_SKINNING
     if (skinnedColorOverride.w > 0.0) color = vec4(skinnedColorOverride.rgb, 1.0);
+    if (skinnedColorScale.w > 0.0) color.rgb *= skinnedColorScale.rgb;
 #endif
 
 #if BGFX_SHADER_LANGUAGE_HLSL

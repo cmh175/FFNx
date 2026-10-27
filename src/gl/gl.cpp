@@ -639,8 +639,10 @@ void gl_draw_external_mesh(ExternalMeshInstance* character, struct light_data* l
 			newRenderer.setAlphaRef(RendererAlphaFunc::GEQUAL, shape.alphaCutoff);
 		}
 
-		// The game fading the character in or out: blend the whole model with that opacity
-		if (character->fadeAlpha < 1.0f)
+		// The game fading the character in or out: blend the whole model with that opacity. A battle scene piece is
+		// darkened instead (the game dims the whole battlefield, e.g. during a summon), so its overlapping layers
+		// don't show through each other
+		if (character->fadeAlpha < 1.0f && !scenePiece)
 		{
 			newRenderer.setBlendMode(RendererBlendMode::BLEND_FACTOR);
 			newRenderer.setBlendFactor(character->fadeAlpha);
@@ -703,6 +705,7 @@ void gl_draw_external_mesh(ExternalMeshInstance* character, struct light_data* l
 			lighting.setAoStrength(savedShading[7]);
 		}
 		newRenderer.setSkinnedColorOverride();
+		newRenderer.setSkinnedColorScale(scenePiece && character->fadeAlpha < 1.0f, character->fadeAlpha);
 
  		if (enable_lighting)
 		{

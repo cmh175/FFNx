@@ -150,6 +150,7 @@ enum RendererUniform
 
     BONE_MATRICES,
     SKINNED_COLOR_OVERRIDE,
+    SKINNED_COLOR_SCALE,
 
     COUNT,
 };
@@ -622,6 +623,9 @@ public:
     // Replaces a skinned model's vertex colors with one color (a color the game adds to a model, drawn as an additive
     // pass through the model's textures); call without arguments to go back to the model's own colors
     void setSkinnedColorOverride(bool enabled = false, float r = 0.0f, float g = 0.0f, float b = 0.0f);
+    // Darkens a skinned model's colors by this factor (a battle scene the game dims); call without arguments to go back
+    // to the model's own colors
+    void setSkinnedColorScale(bool enabled = false, float scale = 1.0f);
 
     // Worldmap
     void setSphericalWorldRate(float value = 0.0f);
