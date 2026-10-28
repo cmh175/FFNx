@@ -71,6 +71,7 @@ struct Shape
     Material* pMaterial = nullptr;
     // Baked lighting: the material's occlusion texture on the second UV set (field 3D scenes)
     bgfx::TextureHandle lightmapTexHandle = BGFX_INVALID_HANDLE;
+    std::string nodeName; // The glTF node a field 3D scene's part belongs to
     bool isDoubleSided = false;
     ShapeAlphaMode alphaMode = ShapeAlphaMode::OPAQUE_MODE;
     float alphaCutoff = 0.5f; // MASK: texels below this are cut out
@@ -243,7 +244,8 @@ struct cgltf_data;
 class ExternalMesh
 {
 public:
-    bool importExternalMeshGltfFile(char* file_path, char* tex_path, bool isZUp = false);
+    // sceneNodes: a field 3D scene, placed by its glTF nodes (every node with a mesh, with its transform)
+    bool importExternalMeshGltfFile(char* file_path, char* tex_path, bool isZUp = false, bool sceneNodes = false);
     uint32_t fillExternalMeshVertexBuffer(struct nvertex* inVertex, struct vector3<float>* normals, struct vector4<float>* joints, struct vector4<float>* weights, uint32_t inCount);
     uint32_t fillExternalMeshIndexBuffer(uint32_t* inIndex, uint32_t inCount);
     void updateExternalMeshBuffers();
@@ -292,7 +294,7 @@ private:
     // The steps of importExternalMeshGltfFile, in order
     void loadTextures(cgltf_data* data, char* tex_path);
     std::vector<std::vector<int>> loadSkins(cgltf_data* data, const char* file_path);
-    void loadMeshes(cgltf_data* data, const std::vector<std::vector<int>>& skinJointRemaps, bool isZUp);
+    void loadMeshes(cgltf_data* data, const std::vector<std::vector<int>>& skinJointRemaps, bool isZUp, bool sceneNodes);
     void findGameBoneJoints();
     void findWeaponShapes();
     void setupSpringBones();

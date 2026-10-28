@@ -25,6 +25,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cfloat>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
@@ -89,7 +90,7 @@ static void appendJointsDepthFirst(int joint, const std::vector<int>& fileParent
     }
 }
 
-bool ExternalMesh::importExternalMeshGltfFile(char* file_path, char* tex_path, bool isZUp)
+bool ExternalMesh::importExternalMeshGltfFile(char* file_path, char* tex_path, bool isZUp, bool sceneNodes)
 {
 	cgltf_options options = {0};
 	cgltf_data* data = NULL;
@@ -121,7 +122,7 @@ bool ExternalMesh::importExternalMeshGltfFile(char* file_path, char* tex_path, b
 	texturePath = tex_path;
 	loadTextures(data, tex_path);
 	auto skinJointRemaps = loadSkins(data, file_path);
-	loadMeshes(data, skinJointRemaps, isZUp);
+	loadMeshes(data, skinJointRemaps, isZUp, sceneNodes);
 	findGameBoneJoints();
 	findWeaponShapes();
 	setupSpringBones();
@@ -287,11 +288,71 @@ std::vector<std::vector<int>> ExternalMesh::loadSkins(cgltf_data* data, const ch
 }
 
 // Reads every mesh primitive into a Shape and its vertex and index data into the GPU buffers
-void ExternalMesh::loadMeshes(cgltf_data* data, const std::vector<std::vector<int>>& skinJointRemaps, bool isZUp)
+// A field 3D scene's part placed by its node's world transform (column-major): positions by the matrix, normals by its
+// cofactor matrix (right under non-uniform scale; its sign follows the determinant's)
+static void placeScenePart(const float* m, std::vector<float>& positions, std::vector<float>& normals)
 {
-	for (size_t i = 0; i < data->meshes_count; i++)
+    for (size_t v = 0; v + 2 < positions.size(); v += 3)
+    {
+        float x = positions[v], y = positions[v + 1], z = positions[v + 2];
+        positions[v] = m[0] * x + m[4] * y + m[8] * z + m[12];
+        positions[v + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+        positions[v + 2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+    }
+
+    auto cross = [](const float* a, const float* b, float* out) {
+        out[0] = a[1] * b[2] - a[2] * b[1];
+        out[1] = a[2] * b[0] - a[0] * b[2];
+        out[2] = a[0] * b[1] - a[1] * b[0];
+    };
+    float cof0[3], cof1[3], cof2[3];
+    cross(&m[4], &m[8], cof0);
+    cross(&m[8], &m[0], cof1);
+    cross(&m[0], &m[4], cof2);
+    float sign = (m[0] * cof0[0] + m[1] * cof0[1] + m[2] * cof0[2]) < 0.0f ? -1.0f : 1.0f;
+    for (size_t v = 0; v + 2 < normals.size(); v += 3)
+    {
+        float x = normals[v], y = normals[v + 1], z = normals[v + 2];
+        float nx = sign * (cof0[0] * x + cof1[0] * y + cof2[0] * z);
+        float ny = sign * (cof0[1] * x + cof1[1] * y + cof2[1] * z);
+        float nz = sign * (cof0[2] * x + cof1[2] * y + cof2[2] * z);
+        float length = sqrtf(nx * nx + ny * ny + nz * nz);
+        if (length > 0.0f) { nx /= length; ny /= length; nz /= length; }
+        normals[v] = nx;
+        normals[v + 1] = ny;
+        normals[v + 2] = nz;
+    }
+}
+
+void ExternalMesh::loadMeshes(cgltf_data* data, const std::vector<std::vector<int>>& skinJointRemaps, bool isZUp, bool sceneNodes)
+{
+	// The parts to load: every mesh as stored, or for a field 3D scene every node with a mesh, placed by its node (a
+	// mesh several nodes use is loaded once per node)
+	struct MeshPlacement { size_t mesh; const cgltf_node* node; };
+	std::vector<MeshPlacement> placements;
+	if (sceneNodes)
 	{
+		for (size_t n = 0; n < data->nodes_count; n++)
+			if (data->nodes[n].mesh != nullptr && data->nodes[n].skin == nullptr) placements.push_back({ static_cast<size_t>(data->nodes[n].mesh - data->meshes), &data->nodes[n] });
+	}
+	else
+	{
+		for (size_t i = 0; i < data->meshes_count; i++) placements.push_back({ i, nullptr });
+	}
+
+	for (const auto& placement : placements)
+	{
+		size_t i = placement.mesh;
 		cgltf_mesh mesh = data->meshes[i];
+
+		float world[16];
+		bool mirrored = false;
+		if (placement.node != nullptr)
+		{
+			cgltf_node_transform_world(placement.node, world);
+			float det = world[0] * (world[5] * world[10] - world[6] * world[9]) - world[4] * (world[1] * world[10] - world[2] * world[9]) + world[8] * (world[1] * world[6] - world[2] * world[5]);
+			mirrored = det < 0.0f;
+		}
 
 		for (size_t j = 0; j < mesh.primitives_count; j++)
 		{
@@ -346,6 +407,19 @@ void ExternalMesh::loadMeshes(cgltf_data* data, const std::vector<std::vector<in
 					weightsAccessor = attr.data;
 				}
 			}
+
+            if (placement.node != nullptr)
+            {
+                placeScenePart(world, positions, normals);
+                for (int k = 0; k < 3; k++)
+                {
+                    float lowest = FLT_MAX, highest = -FLT_MAX;
+                    for (size_t v = k; v < positions.size(); v += 3) { lowest = std::min(lowest, positions[v]); highest = std::max(highest, positions[v]); }
+                    (&outShape.min.x)[k] = lowest;
+                    (&outShape.max.x)[k] = highest;
+                }
+                if (placement.node->name != nullptr) outShape.nodeName = placement.node->name;
+            }
 
             auto material = primitive.material;
             outShape.isDoubleSided = material != nullptr && material->double_sided;
@@ -481,8 +555,9 @@ void ExternalMesh::loadMeshes(cgltf_data* data, const std::vector<std::vector<in
 			// glTF triangles face the side they wind counter-clockwise around, the game's own models the other side.
 			// Swapping Y and Z (above, when not Z-up) mirrors the mesh, which already turns every triangle around;
 			// Z-up meshes keep their coordinates, so turn their triangles around here. Either way, back faces are then
-			// culled like the game's own models.
-			if (isZUp)
+			// culled like the game's own models. A scene part under a mirroring node is turned around once more (glTF:
+			// a negative determinant flips the winding).
+			if (isZUp != mirrored)
 			{
 				for (size_t triangle = 0; triangle + 2 < outShape.indices.size(); triangle += 3)
 					std::swap(outShape.indices[triangle + 1], outShape.indices[triangle + 2]);

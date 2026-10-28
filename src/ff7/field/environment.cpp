@@ -68,7 +68,7 @@ namespace ff7::field
 
         auto loadStart = std::chrono::steady_clock::now();
         auto loaded = std::make_unique<ExternalMesh>();
-        if (!loaded->importExternalMeshGltfFile(gltfPath, texPath, true)) return;
+        if (!loaded->importExternalMeshGltfFile(gltfPath, texPath, true, true)) return;
         mesh = std::move(loaded);
 
         try
