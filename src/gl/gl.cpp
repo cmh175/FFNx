@@ -33,6 +33,7 @@
 #include "../lighting.h"
 
 #include "../ff7/widescreen.h"
+#include "../ff7/field/environment.h"
 #include "external_mesh.h"
 
 struct matrix d3dviewport_matrix = {
@@ -310,6 +311,9 @@ void gl_draw_indexed_primitive(uint32_t primitivetype, uint32_t vertextype, stru
 	// should never happen, broken 3rd-party models cause this
 	if(!count) return;
 
+	// A field's 3D scene (in place of its painted background) is drawn before the frame's first 3D draw
+	if(!ff8 && vertextype != TLVERTEX && mode == MODE_FIELD) ff7::field::environment.drawBeforeFirst3dDraw();
+
 	// scissor test is used to emulate D3D viewports
 	if (clip) newRenderer.doScissorTest(true);
 	else newRenderer.doScissorTest(false);
@@ -459,6 +463,8 @@ void gl_draw_external_mesh(ExternalMeshInstance* character, struct light_data* l
 
 	// Fully faded out (or not faded in yet)
 	if(character->fadeAlpha <= 0.0f) return;
+
+	if(!ff8 && getmode_cached()->driver_mode == MODE_FIELD) ff7::field::environment.drawBeforeFirst3dDraw();
 
 	if(gl_defer_external_mesh(character, lightdata)) return;
 

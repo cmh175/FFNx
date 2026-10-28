@@ -31,6 +31,7 @@
 #include "defs.h"
 #include "utils.h"
 #include "camera.h"
+#include "environment.h"
 
 #include <functional>
 
@@ -44,6 +45,9 @@ namespace ff7::field
 
     void field_layer1_pick_tiles(short bg_position_x, short bg_position_y)
     {
+        // A 3D scene replaces the painted background (environment.h)
+        if (environment.hidesBackground()) return;
+
         int field_bg_multiplier = *ff7_externals.field_bg_multiplier;
         vector2<float> bg_position, initial_pos, tile_position;
         field_tile* layer1_tiles = *ff7_externals.field_layer1_tiles;
@@ -79,6 +83,9 @@ namespace ff7::field
 
     void field_layer2_pick_tiles(short bg_position_x, short bg_position_y)
     {
+        // A 3D scene replaces the painted background (environment.h)
+        if (environment.hidesBackground()) return;
+
         int field_bg_multiplier = *ff7_externals.field_bg_multiplier;
         field_tile *layer2_tiles = *ff7_externals.field_layer2_tiles;
         vector2<float> bg_position, initial_pos;
@@ -141,6 +148,9 @@ namespace ff7::field
 
     void field_layer3_pick_tiles(short bg_position_x, short bg_position_y)
     {
+        // A 3D scene replaces the painted background (environment.h)
+        if (environment.hidesBackground()) return;
+
         if(!*ff7_externals.do_draw_layer3_CFFE3C)
             return;
 
@@ -268,6 +278,9 @@ namespace ff7::field
 
     void field_layer4_pick_tiles(short bg_position_x, short bg_position_y)
     {
+        // A 3D scene replaces the painted background (environment.h)
+        if (environment.hidesBackground()) return;
+
         if(*ff7_externals.do_draw_layer4_CFFEA4)
         {
             int field_bg_multiplier = *ff7_externals.field_bg_multiplier;

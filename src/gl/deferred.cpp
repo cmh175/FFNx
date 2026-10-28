@@ -21,6 +21,7 @@
 /****************************************************************************/
 
 #include "../renderer.h"
+#include "../ff7/field/environment.h"
 
 #include "../gl.h"
 #include "../external_mesh.h"
@@ -676,6 +677,11 @@ void gl_draw_deferred(draw_field_shadow_callback shadow_callback)
 
 		if (shadow_callback != nullptr && !isFieldShadowDrawn && deferred_draws[i].vertextype != TLVERTEX)
 		{
+			newRenderer.setD3DProjection(&deferred_draws[i].state.d3dprojection_matrix);
+			newRenderer.setD3DViweport(&d3dviewport_matrix);
+
+			// A field's 3D scene (in place of its painted background) is drawn first, with the same projection
+			ff7::field::environment.draw();
 			newRenderer.setD3DProjection(&deferred_draws[i].state.d3dprojection_matrix);
 			newRenderer.setD3DViweport(&d3dviewport_matrix);
 
