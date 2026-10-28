@@ -57,6 +57,7 @@ namespace ff7::field
         if (mesh) mesh->destroyFieldResources();
         mesh.reset();
         keepBackground = false;
+        lightmapIntensity = 1.0f;
         if (current.empty() || !enable_external_mesh) return;
 
         char gltfPath[MAX_PATH], texPath[MAX_PATH], configPath[MAX_PATH];
@@ -74,6 +75,7 @@ namespace ff7::field
         {
             auto config = toml::parse_file(configPath);
             keepBackground = config["environment"]["keep_background"].value_or(false);
+            lightmapIntensity = static_cast<float>(config["environment"]["lightmap_intensity"].value_or(1.0));
         }
         catch (const toml::parse_error &err)
         {
@@ -179,6 +181,9 @@ namespace ff7::field
                 newRenderer.useTexture(bgfx::isValid(baseColorTexHandle) ? baseColorTexHandle.idx : 0, RendererTextureSlot::TEX_Y);
                 newRenderer.useTexture(bgfx::isValid(normalTexHandle) ? normalTexHandle.idx : 0, RendererTextureSlot::TEX_NML);
                 newRenderer.useTexture(bgfx::isValid(pbrTexHandle) ? pbrTexHandle.idx : 0, RendererTextureSlot::TEX_PBR);
+                // Baked lighting, on the part's second UV set
+                newRenderer.useTexture(bgfx::isValid(shape.lightmapTexHandle) ? shape.lightmapTexHandle.idx : 0, RendererTextureSlot::TEX_LM);
+                newRenderer.setLightmapIntensity(lightmapIntensity);
                 newRenderer.bindTextures();
 
                 newRenderer.setCommonUniforms();
@@ -190,6 +195,7 @@ namespace ff7::field
         }
 
         newRenderer.discardAllBindings();
+        newRenderer.useTexture(0, RendererTextureSlot::TEX_LM);
         newRenderer.isExternalTexture(false);
         gl_load_state(&savedState, true);
     }

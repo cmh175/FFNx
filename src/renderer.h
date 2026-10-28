@@ -197,6 +197,7 @@ namespace RendererTextureSlot {
         TEX_IBL_DIFF,
         TEX_BRDF,
         TEX_G_LUT,
+        TEX_LM, // Baked lighting of a field's 3D scene (lightmap, second UV set)
         COUNT
     };
 };
@@ -288,6 +289,7 @@ private:
 
         bool bDoAlphaTest = false;
         float alphaRef = 0.0f;
+        float lightmapIntensity = 1.0f;
         RendererAlphaFunc alphaFunc;
 
         bool bDoDepthTest = false;
@@ -557,6 +559,8 @@ public:
     void isTLVertex(bool flag = false);
     void setBlendMode(RendererBlendMode mode = RendererBlendMode::BLEND_NONE);
     void setBlendFactor(float opacity);
+    // How bright a bound lightmap (TEX_LM) is drawn
+    void setLightmapIntensity(float intensity = 1.0f);
     void isTexture(bool flag = false);
     void isFBTexture(bool flag = false);
     void isFullRange(bool flag = false);

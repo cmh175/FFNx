@@ -69,6 +69,8 @@ struct Shape
     vector3<float> min;
     vector3<float> max;
     Material* pMaterial = nullptr;
+    // Baked lighting: the material's occlusion texture on the second UV set (field 3D scenes)
+    bgfx::TextureHandle lightmapTexHandle = BGFX_INVALID_HANDLE;
     bool isDoubleSided = false;
     ShapeAlphaMode alphaMode = ShapeAlphaMode::OPAQUE_MODE;
     float alphaCutoff = 0.5f; // MASK: texels below this are cut out
@@ -304,6 +306,10 @@ private:
     // Config
     toml::parse_result config;
     std::string configPath;
+    std::string texturePath;
+    std::map<std::string, bgfx::TextureHandle> lightmapTexHandles; // by image name, shared by the parts using them
+
+    bgfx::TextureHandle loadLightmap(const std::string& name);
     std::filesystem::file_time_type configWriteTime = std::filesystem::file_time_type::min();
     std::chrono::steady_clock::time_point configLastCheck = {};
     void applyMaterialSettings(Shape& shape);

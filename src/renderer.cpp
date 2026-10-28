@@ -140,9 +140,9 @@ void Renderer::setCommonUniforms()
         (float)(internalState.texHandlers[RendererTextureSlot::TEX_NML].idx != bgfx::kInvalidHandle),
         (float)(internalState.texHandlers[RendererTextureSlot::TEX_PBR].idx != bgfx::kInvalidHandle),
         (float)(specularIblTexture.idx != bgfx::kInvalidHandle && diffuseIblTexture.idx != bgfx::kInvalidHandle && envBrdfTexture.idx != bgfx::kInvalidHandle),
-        NULL
+        internalState.texHandlers[RendererTextureSlot::TEX_LM].idx != bgfx::kInvalidHandle ? internalState.lightmapIntensity : 0.0f
     };
-    if (uniform_log) ffnx_trace("%s: FSTexFlags XYZW(isNmlTextureLoaded %f, isPbrTextureLoaded %f, isIblTextureLoaded %f, NULL)\n", __func__, internalState.FSTexFlags[0], internalState.FSTexFlags[1], internalState.FSTexFlags[2]);
+    if (uniform_log) ffnx_trace("%s: FSTexFlags XYZW(isNmlTextureLoaded %f, isPbrTextureLoaded %f, isIblTextureLoaded %f, lightmapIntensity %f)\n", __func__, internalState.FSTexFlags[0], internalState.FSTexFlags[1], internalState.FSTexFlags[2], internalState.FSTexFlags[3]);
 
     internalState.WMFlags = {
         (float)internalState.sphericalWorldRate,
@@ -852,6 +852,10 @@ void Renderer::bindTextures()
                         continue;
                     case RendererTextureSlot::TEX_G_LUT:
                         flags |= BGFX_SAMPLER_POINT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP | BGFX_SAMPLER_W_CLAMP;
+                        break;
+                    case RendererTextureSlot::TEX_LM:
+                        // A lightmap is an atlas: its edges don't wrap around
+                        flags |= BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP | BGFX_SAMPLER_W_CLAMP;
                         break;
                     default:
                         break;
@@ -2307,6 +2311,11 @@ void Renderer::setBlendFactor(float opacity)
 {
     uint32_t value = static_cast<uint32_t>(std::clamp(opacity, 0.0f, 1.0f) * 255.0f + 0.5f);
     internalState.blendFactorRgba = (value << 24) | (value << 16) | (value << 8) | value;
+};
+
+void Renderer::setLightmapIntensity(float intensity)
+{
+    internalState.lightmapIntensity = intensity;
 };
 
 void Renderer::isTexture(bool flag)

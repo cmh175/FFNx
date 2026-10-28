@@ -47,6 +47,7 @@ namespace ff7::field
         std::unique_ptr<ExternalMesh> mesh;
         std::string fieldName; // the field the scene was looked up for
         bool keepBackground = false;
+        float lightmapIntensity = 1.0f; // [environment] lightmap_intensity
         uint32_t lastDrawnFrame = UINT32_MAX;
     };
 

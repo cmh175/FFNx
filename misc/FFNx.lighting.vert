@@ -17,7 +17,7 @@
 // This shader is used for 3D elements when advanced lighting is enabled.
 
 $input a_position, a_color0, a_texcoord0, a_normal, a_indices, a_weight
-$output v_color0, v_texcoord0, v_position0, v_shadow0, v_normal0
+$output v_color0, v_texcoord0, v_texcoord1, v_position0, v_shadow0, v_normal0
 
 #include <bgfx/bgfx_shader.sh>
 #include "FFNx.common.sh"
@@ -147,4 +147,6 @@ void main()
     gl_Position = pos;
     v_color0 = color;
     v_texcoord0 = coords;
+    // Lightmap coordinates of a field 3D scene's parts, which carry them in the (unused) weights
+    v_texcoord1 = a_weight.xy;
 }

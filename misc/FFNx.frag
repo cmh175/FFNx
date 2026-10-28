@@ -23,7 +23,7 @@
 // This shader is always used for 2D elements.
 // This shader is used for 3D elements when advanced lighting is disabled.
 
-$input v_color0, v_texcoord0, v_position0, v_normal0
+$input v_color0, v_texcoord0, v_texcoord1, v_position0, v_normal0
 
 #include <bgfx/bgfx_shader.sh>
 #include "FFNx.common.sh"
@@ -31,6 +31,8 @@ $input v_color0, v_texcoord0, v_position0, v_normal0
 SAMPLER2D(tex_0, 0);
 SAMPLER2D(tex_1, 1);
 SAMPLER2D(tex_2, 2);
+// TEX_LM: a field 3D scene's baked lighting
+SAMPLER2D(tex_11, 11);
 
 uniform mat4 invViewMatrix;
 
@@ -39,6 +41,7 @@ uniform vec4 FSAlphaFlags;
 uniform vec4 FSMiscFlags;
 uniform vec4 FSHDRFlags;
 uniform vec4 FSTexFlags;
+#define lightmapIntensity FSTexFlags.w
 uniform vec4 WMFlags;
 uniform vec4 TimeColor;
 uniform vec4 TimeData;
@@ -158,6 +161,9 @@ void main()
         }
 
     } //end if (isTexture)
+
+    // Baked lighting (a field's 3D scene): the lightmap, on the part's second UV set
+    if (lightmapIntensity > 0.0) color.rgb *= texture2D(tex_11, v_texcoord1).rgb * lightmapIntensity;
 
     if (isTimeFilterEnabled) color.rgb *= TimeColor.rgb;
 

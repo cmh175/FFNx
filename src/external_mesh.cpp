@@ -118,6 +118,7 @@ bool ExternalMesh::importExternalMeshGltfFile(char* file_path, char* tex_path, b
     configWriteTime = configFileTime(configPath);
     configLastCheck = std::chrono::steady_clock::now();
 
+	texturePath = tex_path;
 	loadTextures(data, tex_path);
 	auto skinJointRemaps = loadSkins(data, file_path);
 	loadMeshes(data, skinJointRemaps, isZUp);
@@ -134,13 +135,27 @@ bool ExternalMesh::importExternalMeshGltfFile(char* file_path, char* tex_path, b
 }
 
 // Loads each texture's DDS files (base color, normal and PBR maps) into materials, by image file name
+// True for a texture the materials only use as a lightmap (occlusion texture on the second UV set): loadLightmap loads
+// those, as linear light
+static bool isLightmapOnly(const cgltf_data* data, const cgltf_texture* texture)
+{
+	bool lightmap = false;
+	for (size_t m = 0; m < data->materials_count; m++)
+	{
+		const cgltf_material& material = data->materials[m];
+		if (material.pbr_metallic_roughness.base_color_texture.texture == texture) return false;
+		if (material.occlusion_texture.texture == texture && material.occlusion_texture.texcoord == 1) lightmap = true;
+	}
+	return lightmap;
+}
+
 void ExternalMesh::loadTextures(cgltf_data* data, char* tex_path)
 {
 	for (size_t i = 0; i < data->textures_count; i++)
 	{
 		auto texture = data->textures[i];
 		std::string name = getImageTextureName(texture.image);
-		if (name.empty()) continue;
+		if (name.empty() || isLightmapOnly(data, &data->textures[i])) continue;
 
 		std::string texFullPath = tex_path + name + ".dds";
 
@@ -288,7 +303,7 @@ void ExternalMesh::loadMeshes(cgltf_data* data, const std::vector<std::vector<in
 
 			// Vertex data is read through cgltf's accessor functions, which handle the file's byte offsets, strides
 			// and number formats
-			std::vector<float> positions, normals, uvs;
+			std::vector<float> positions, normals, uvs, lightmapUvs;
             const cgltf_accessor* jointsAccessor = nullptr;
             const cgltf_accessor* weightsAccessor = nullptr;
 			for (size_t k = 0; k < primitive.attributes_count; k++)
@@ -317,6 +332,11 @@ void ExternalMesh::loadMeshes(cgltf_data* data, const std::vector<std::vector<in
 					uvs.resize(attr.data->count * 2);
 					cgltf_accessor_unpack_floats(attr.data, uvs.data(), uvs.size());
 				}
+				else if(strcmp(attr.name, "TEXCOORD_1") == 0)
+				{
+					lightmapUvs.resize(attr.data->count * 2);
+					cgltf_accessor_unpack_floats(attr.data, lightmapUvs.data(), lightmapUvs.size());
+				}
                 else if(strcmp(attr.name, "JOINTS_0") == 0)
 				{
 					jointsAccessor = attr.data;
@@ -329,6 +349,10 @@ void ExternalMesh::loadMeshes(cgltf_data* data, const std::vector<std::vector<in
 
             auto material = primitive.material;
             outShape.isDoubleSided = material != nullptr && material->double_sided;
+
+            // Baked lighting: the material's occlusion texture on the second UV set is a lightmap (field 3D scenes)
+            if (material != nullptr && material->occlusion_texture.texture != nullptr && material->occlusion_texture.texcoord == 1)
+                outShape.lightmapTexHandle = loadLightmap(getImageTextureName(material->occlusion_texture.texture->image));
             if (mesh.name != nullptr)
             {
                 outShape.name = mesh.name;
@@ -435,6 +459,17 @@ void ExternalMesh::loadMeshes(cgltf_data* data, const std::vector<std::vector<in
                     weights.y = fileWeights[1];
                     weights.z = fileWeights[2];
                     weights.w = fileWeights[3];
+
+                    outShape.weights.push_back(weights);
+                }
+                else if (jointsAccessor == nullptr && !lightmapUvs.empty())
+                {
+                    // A part without a skeleton carries its second UV set (lightmap coordinates) in the weights
+                    struct vector4<float> weights;
+                    weights.x = lightmapUvs[2 * vertexIndex];
+                    weights.y = lightmapUvs[2 * vertexIndex + 1];
+                    weights.z = 0.0f;
+                    weights.w = 0.0f;
 
                     outShape.weights.push_back(weights);
                 }
@@ -902,9 +937,35 @@ void ExternalMesh::unloadExternalMesh()
                 bgfx::destroy(tex);
         }
     }
+    for (const auto& lightmap : lightmapTexHandles)
+    {
+        if (bgfx::isValid(lightmap.second))
+            bgfx::destroy(lightmap.second);
+    }
+    lightmapTexHandles.clear();
     shapes.clear();
     materials.clear();
     clearExternalMesh3dBuffers();
+}
+
+// A lightmap (linear light, HDR when stored as BC6H) loaded once per image and shared by the parts using it
+bgfx::TextureHandle ExternalMesh::loadLightmap(const std::string& name)
+{
+    if (name.empty()) return BGFX_INVALID_HANDLE;
+
+    auto found = lightmapTexHandles.find(name);
+    if (found != lightmapTexHandles.end()) return found->second;
+
+    uint32_t width, height, mipCount = 0;
+    std::string path = texturePath + name + ".dds";
+    auto handle = newRenderer.createTextureHandle(path.data(), &width, &height, &mipCount, false);
+    if (!handle.idx)
+    {
+        ffnx_warning("External mesh: lightmap %s not found\n", path.c_str());
+        handle = BGFX_INVALID_HANDLE;
+    }
+    lightmapTexHandles[name] = handle;
+    return handle;
 }
 
 void ExternalMesh::loadConfig(const std::string& path)

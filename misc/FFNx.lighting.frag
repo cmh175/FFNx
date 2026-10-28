@@ -16,7 +16,7 @@
 // This shader is never used for 2D elements.
 // This shader is used for 3D elements when advanced lighting is enabled.
 
-$input v_color0, v_texcoord0, v_position0, v_shadow0, v_normal0
+$input v_color0, v_texcoord0, v_texcoord1, v_position0, v_shadow0, v_normal0
 
 #include <bgfx/bgfx_shader.sh>
 #include "FFNx.lighting.sh"
@@ -29,6 +29,8 @@ SAMPLER2D(tex_2, 2); // V
 SAMPLER2D(tex_5, 5);
 // TEX_PBR
 SAMPLER2D(tex_6, 6);
+// TEX_LM: a field 3D scene's baked lighting
+SAMPLER2D(tex_11, 11);
 
 uniform vec4 VSFlags;
 uniform vec4 FSAlphaFlags;
@@ -95,6 +97,7 @@ uniform vec4 gameScriptedLightColor;
 #define isNmlTextureLoaded FSTexFlags.x > 0.0
 #define isPbrTextureLoaded FSTexFlags.y > 0.0
 #define isIblTextureLoaded FSTexFlags.z > 0.0
+#define lightmapIntensity FSTexFlags.w
 
 #define gameLightingMode gameLightingFlags.x
 #define GAME_LIGHTING_PER_PIXEL 2
@@ -244,6 +247,13 @@ void main()
         else
         {
             indirectLuminance = CalcConstIndirectLuminance(color.rgb);
+        }
+
+        // Baked lighting (a field's 3D scene): the lightmap replaces the part's dynamic light
+        if (lightmapIntensity > 0.0)
+        {
+            luminance = color.rgb * texture2D(tex_11, v_texcoord1).rgb * lightmapIntensity;
+            indirectLuminance = vec3_splat(0.0);
         }
 
         if(debugOutput == DEBUG_OUTPUT_COLOR)
