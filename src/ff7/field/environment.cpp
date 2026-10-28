@@ -25,8 +25,12 @@
 
 #include "environment.h"
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <filesystem>
+#include <map>
+#include <set>
 #include <toml++/toml.h>
 
 void ff7_get_field_view_matrix(struct matrix *outViewMatrix);
@@ -45,6 +49,61 @@ namespace ff7::field
         matrix->_33 = 0.0f;
     }
 
+    // bg<group>s<state> anywhere in a part's name (any case): group 1-63, state 0-7
+    static bool parse_background_tag(const std::string& name, uint8_t& group, uint8_t& stateBits)
+    {
+        std::string lower = name;
+        std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
+        for (size_t at = lower.find("bg"); at != std::string::npos; at = lower.find("bg", at + 1))
+        {
+            size_t i = at + 2, digits = i;
+            while (i < lower.size() && isdigit((unsigned char)lower[i])) i++;
+            if (i == digits || i >= lower.size() || lower[i] != 's') continue;
+            size_t stateAt = ++i;
+            while (i < lower.size() && isdigit((unsigned char)lower[i])) i++;
+            if (i == stateAt) continue;
+            int g = atoi(lower.substr(digits, stateAt - 1 - digits).c_str()), st = atoi(lower.substr(stateAt, i - stateAt).c_str());
+            if (g < 1 || g > 63 || st < 0 || st > 7) continue;
+            group = static_cast<uint8_t>(g);
+            stateBits = static_cast<uint8_t>(1 << st);
+            return true;
+        }
+        return false;
+    }
+
+    // Which background groups and state bits the field's painted tiles use (layers 2-4), for scene makers
+    void Environment::logBackgroundGroups()
+    {
+        if (!(trace_all || trace_loaders)) return;
+
+        std::map<int, std::set<int>> groups;
+        uint32_t* counts[] = { ff7_externals.field_layer2_tiles_num, ff7_externals.field_layer3_tiles_num, ff7_externals.field_layer4_tiles_num };
+        field_tile** tiles[] = { ff7_externals.field_layer2_tiles, ff7_externals.field_layer3_tiles, ff7_externals.field_layer4_tiles };
+        for (int layer = 0; layer < 3; ++layer)
+        {
+            if (counts[layer] == nullptr || tiles[layer] == nullptr || *tiles[layer] == nullptr) continue;
+            for (uint32_t t = 0; t < *counts[layer]; ++t)
+            {
+                const field_tile& tile = (*tiles[layer])[t];
+                if (tile.anim_group) groups[(uint8_t)tile.anim_group].insert((uint8_t)tile.anim_bitmask);
+            }
+        }
+
+        std::string list;
+        for (const auto& group : groups)
+        {
+            char entry[64];
+            sprintf(entry, "%s%d:", list.empty() ? "" : ", ", group.first);
+            list += entry;
+            for (int bits : group.second)
+            {
+                sprintf(entry, " 0x%02X", bits);
+                list += entry;
+            }
+        }
+        ffnx_trace("Field environment: %s background groups (group: state bits of its tiles): %s\n", fieldName.c_str(), list.empty() ? "none" : list.c_str());
+    }
+
     void Environment::update()
     {
         const char* name = get_current_field_name();
@@ -52,10 +111,13 @@ namespace ff7::field
         if (current == fieldName) return;
 
         fieldName = current;
+        if (!current.empty()) logBackgroundGroups();
 
         // The previous field's scene gives its textures and buffers back to the graphics card
         if (mesh) mesh->destroyFieldResources();
         mesh.reset();
+        partGroups.clear();
+        partStateBits.clear();
         keepBackground = false;
         lightmapIntensity = 1.0f;
         if (current.empty() || !enable_external_mesh) return;
@@ -70,6 +132,17 @@ namespace ff7::field
         auto loaded = std::make_unique<ExternalMesh>();
         if (!loaded->importExternalMeshGltfFile(gltfPath, texPath, true, true)) return;
         mesh = std::move(loaded);
+
+        // Parts tagged for a background group (bg<group>s<state> in the node's name, or the mesh's)
+        partGroups.assign(mesh->shapes.size(), 0);
+        partStateBits.assign(mesh->shapes.size(), 0);
+        for (size_t i = 0; i < mesh->shapes.size(); ++i)
+        {
+            const auto& shape = mesh->shapes[i];
+            const std::string& name = shape.nodeName.empty() ? shape.name : shape.nodeName;
+            if (parse_background_tag(name, partGroups[i], partStateBits[i]) && (trace_all || trace_loaders))
+                ffnx_trace("Field environment: %s shows with background group %d, state bits 0x%02X\n", name.c_str(), partGroups[i], partStateBits[i]);
+        }
 
         try
         {
@@ -147,6 +220,9 @@ namespace ff7::field
                 auto& shape = mesh->shapes[i];
                 bool blended = shape.alphaMode == ShapeAlphaMode::BLEND_MODE;
                 if (blended != (pass == 1)) continue;
+
+                // A part tagged for a background group shows while the script has that state on, like its painted tiles
+                if (partGroups[i] != 0 && !(ff7_externals.modules_global_object->background_sprite_layer[partGroups[i]] & partStateBits[i])) continue;
 
                 newRenderer.setInterpolationQualifier(SMOOTH);
                 newRenderer.setCullMode(shape.isDoubleSided ? RendererCullMode::DISABLED : RendererCullMode::BACK);

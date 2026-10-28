@@ -17,6 +17,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 #include <stdint.h>
 
 class ExternalMesh;
@@ -27,6 +28,8 @@ namespace ff7::field
     // field's own coordinates and units with Z up (exported from Blender with the default glTF settings, Blender's
     // coordinates are the field's) and drawn from the game's field camera. The game itself (walkmesh, scripts,
     // camera) doesn't change.
+    // A part whose node name contains bg<group>s<state> (e.g. door_bg3s1) shows only while the field's script has that
+    // background group's state on, like the painted tiles it replaces (doors, lights, machinery).
     class Environment
     {
     public:
@@ -43,12 +46,15 @@ namespace ff7::field
 
     private:
         bool isShown();
+        void logBackgroundGroups();
 
         std::unique_ptr<ExternalMesh> mesh;
         std::string fieldName; // the field the scene was looked up for
         bool keepBackground = false;
         float lightmapIntensity = 1.0f; // [environment] lightmap_intensity
         uint32_t lastDrawnFrame = UINT32_MAX;
+        std::vector<uint8_t> partGroups; // per part: the background group it belongs to (0 = always shown)
+        std::vector<uint8_t> partStateBits; // per part: the state bits of that group it shows with
     };
 
     extern Environment environment;
